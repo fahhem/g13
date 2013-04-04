@@ -2,6 +2,8 @@ import importlib
 
 import g13
 import libusb1
+
+import autopy
 import wx
 
 """
@@ -22,6 +24,7 @@ functions that take the state object and which key was pressed.
 
 plugins = [
   'plugins.example.register',
+  'plugins.chrome.register',
 ]
 
 class G13Keys(object):
@@ -106,11 +109,16 @@ def import_string(modstr):
   module = importlib.import_module(mod)
   return getattr(module, func)
 
+class ActionHelper(object):
+  def get_active_window(self):
+    return wx.GetActiveWindow()
+
 class PluginState(object):
   def __init__(self, handler):
     self.handler = handler
     self.states = {}
     self.stack = []
+    self.action = ActionHelper()
 
   @property
   def current_state(self):

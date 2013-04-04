@@ -5,12 +5,13 @@ class ExamplePlugin(object):
   def default_entered(self, state_obj, new_state):
     # Activates self in 5 seconds, simulates the OS doing so.
     threading.Thread(target=self.self_activate,
-                     args=(state_obj.enter_state,)).start()
+                     args=(state_obj,)).start()
 
-  def self_activate(self, enter_state):
+  def self_activate(self, state):
+    print state.action.get_active_window()
     time.sleep(2)
     print 'activating our state'
-    enter_state('example_state')
+    state.enter_state('example_state')
 
   def state_entered(self, state_obj, new_state):
     print 'entered our state'
