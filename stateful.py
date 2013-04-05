@@ -1,10 +1,14 @@
 import importlib
+import threading
+import time
+import platform
 
 import g13
 import libusb1
 
 import autopy
-import wx
+if platform.system() == 'Windows':
+  import win32gui
 
 """
 Plugins are registered by a function in the plugins list by calling
@@ -110,19 +114,71 @@ def import_string(modstr):
   return getattr(module, func)
 
 class ActionHelper(object):
-  def get_active_window(self):
-    return wx.GetActiveWindow()
+  def __new__(cls, *args):
+    if platform.system() == 'Windows':
+      cls = WindowsActionHelper
+    elif platform.system() == 'Linux':
+      cls = LinuxActionHelper
+    return object.__new__(cls, *args)
+  def __init__(self, state_obj):
+    self.window_registration = {}
+    self.state_obj = state_obj
+    
+  # Window title functions
+  def register_window_listener(self, filter_func, activate_cb):
+    self.window_registration[filter_func] = activate_cb
+  def unregister_window_listener(self, filter_func):
+    del self.window_registration[filter_func]
+  def start_window_listener(self):
+    self.stop = False
+    threading.Thread(target=self.check_window).start()
+  def stop_window_listener(self):
+    self.stop = True
+  def check_window(self):
+    while not self.stop:
+      if not self.window_registration:
+        time.sleep(1)
+        continue
+      title = self.get_active_window_title()
+      for filter_func, activate_cb in self.window_registration.items():
+        if filter_func(title):
+          activate_cb(self.state_obj, title)
+  def press_key(self, key, modifiers=0):
+    autopy.key.toggle(key, True, modifiers)
+  def release_key(self, key, modifiers=0):
+    autopy.key.toggle(key, False, modifiers)
+  def tap_key(self, key, modifiers=0):
+    autopy.key.tap(key, modifiers)
+  # Platform-specific functions
+  def get_active_window_title(self):
+    pass
+
+# Constants pulled in from autopy for now, we reserve the right to change their
+# values, so always pull them from the state object's action instance. To make
+# sure, some of the attribute names don't match autopy's. :P
+for attr in dir(autopy.key):
+  if attr.startswith('MOD_'):
+    setattr(ActionHelper, attr, getattr(autopy.key, attr))
+  elif attr.startswith('K_'):
+    setattr(ActionHelper, 'KEY_' + (attr[2:]), getattr(autopy.key, attr))
+
+class WindowsActionHelper(ActionHelper):
+  def get_active_window_title(self):
+    return win32gui.GetWindowText(win32gui.GetForegroundWindow())
 
 class PluginState(object):
   def __init__(self, handler):
     self.handler = handler
     self.states = {}
     self.stack = []
-    self.action = ActionHelper()
+    self.action = ActionHelper(self)
 
   @property
   def current_state(self):
-    return self.states[self.stack[-1]] if self.stack else None
+    return self.states[self.current_state_name] if self.stack else None
+  @property
+  def current_state_name(self):
+    return self.stack[-1] if self.stack else None
 
   def register_plugin(self, states={}):
     for state_name, actions in states.items():
@@ -168,44 +224,41 @@ class PluginState(object):
       handler(self, self.current_state, *args)
 
   def enter_state(self, state_name):
-    if state_name == self.current_state:
+    if state_name == self.current_state_name:
       return
 
     self.stack.append(state_name)
+    if state_name not in self.states:
+      print 'WARNING: Entering unregistered state:', state_name
+      self.states[state_name] = {}
     self.handle_state_event('enter')
 
   def exit_state(self, state_name):
-    if state_name != self.current_state:
+    # Only pop off states.
+    if state_name != self.current_state_name:
       return
 
-    self.stack.pop()
     self.handle_state_event('exit')
+    self.stack.remove(state_name)
 
   def key_changed(self, key, is_pressed):
-    if is_pressed:
-      keys = self.current_state.get('key_press', {})
-    else:
-      keys = self.current_state.get('key_release', {})
+    local_stack = list(self.stack)
+    while local_stack:
+      state = local_stack.pop()
+      if is_pressed:
+        keys = self.states[state].get('key_press', {})
+      else:
+        keys = self.states[state].get('key_release', {})
 
-    funcs = keys.get(key)
-    if not funcs:
-      return
-    [func(self, key) for func in funcs]
+      funcs = keys.get(key)
+      if not funcs:
+        # If nothing's registered, try the previous state.
+        continue
+      [func(self, key) for func in funcs]
+      break
 
-if __name__ == '__main__':
-  handler = G13Handler()
-  state = PluginState(handler)
-  for plugin in plugins:
-    func = import_string(plugin)
-    func(state)
-
-  try:
-    wx.App()
-  except:
-    print 'No GUI'
-
-  state.enter_state('default')
-  for _ in range(500):
+def listen_for_keys():
+  while True: # for _ in range(500):
     new_keys, changed_keys = handler.maybe_get_new_keys()
     if not new_keys:  # Checking for None, not all 0s.
       continue
@@ -229,3 +282,20 @@ if __name__ == '__main__':
     print
     print
 
+if __name__ == '__main__':
+  handler = G13Handler()
+  state = PluginState(handler)
+  for plugin in plugins:
+    func = import_string(plugin)
+    func(state)
+
+  state.enter_state('default')
+  state.action.start_window_listener()
+  try:
+    listen_for_keys()
+  except Exception as e:
+    print 'error', e
+    raise
+  finally:
+    state.action.stop_window_listener()
+  

@@ -8,7 +8,6 @@ class ExamplePlugin(object):
                      args=(state_obj,)).start()
 
   def self_activate(self, state):
-    print state.action.get_active_window()
     time.sleep(2)
     print 'activating our state'
     state.enter_state('example_state')
