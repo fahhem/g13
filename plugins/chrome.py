@@ -3,7 +3,7 @@ import time
 class ChromePlugin(object):
   def __init__(self):
     self.reversed = False
-    
+
   def start_listening(self, state_obj, new_state):
     state_obj.action.register_window_listener(
         self.window_title_filter, self.activate)
@@ -22,7 +22,7 @@ class ChromePlugin(object):
     if tab == '14':
       tab = '9'
     state_obj.action.tap_key(tab, state_obj.action.MOD_CONTROL)
-    
+
   def start_switch_tab(self, state_obj, key):
     state_obj.enter_state('chrome_tab_change')
   def stop_switch_tab(self, state_obj, key):
@@ -47,7 +47,7 @@ class ChromePlugin(object):
     state_obj.enter_state('chrome_closed_tab')
   def finish_close_tab(self, state_obj, key):
     state_obj.exit_state('chrome_closed_tab')
-        
+
   def reverse(self, state_obj, key):
     print 'reversing'
     if self.reversed:
@@ -55,7 +55,7 @@ class ChromePlugin(object):
     else:
       state_obj.enter_state('chrome_reverse')
     self.reversed = not self.reversed
-    
+
   def page_back(self, state_obj, key):
     state_obj.action.tap_key(
         state_obj.action.KEY_LEFT, state_obj.action.MOD_ALT)
@@ -72,7 +72,7 @@ class ChromePlugin(object):
 def register(state):
   plugin = ChromePlugin()
   nop = lambda s, k: None
-  
+
   key_press = {
     'G' + str(key+1): plugin.change_tab for key in range(7)+[14-1]
   }
@@ -83,7 +83,7 @@ def register(state):
   key_press['G15'] = plugin.page_back
   key_press['G16'] = plugin.page_refresh
   key_press['G19'] = plugin.page_forward
-  
+
   key_release = {
     'G20': plugin.stop_switch_tab,
     'G22': plugin.stop_switch_tab,

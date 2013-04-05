@@ -123,7 +123,7 @@ class ActionHelper(object):
   def __init__(self, state_obj):
     self.window_registration = {}
     self.state_obj = state_obj
-    
+
   # Window title functions
   def register_window_listener(self, filter_func, activate_cb):
     self.window_registration[filter_func] = activate_cb
@@ -298,4 +298,4 @@ if __name__ == '__main__':
     raise
   finally:
     state.action.stop_window_listener()
-  
+
