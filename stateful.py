@@ -9,6 +9,8 @@ import libusb1
 import autopy
 if platform.system() == 'Windows':
   import win32gui
+elif platform.system() == 'Linux':
+  import subprocess
 
 """
 Plugins are registered by a function in the plugins list by calling
@@ -165,6 +167,13 @@ for attr in dir(autopy.key):
 class WindowsActionHelper(ActionHelper):
   def get_active_window_title(self):
     return win32gui.GetWindowText(win32gui.GetForegroundWindow())
+
+class LinuxActionHelper(ActionHelper):
+  def get_active_window_title(self):
+    return subprocess.Popen(
+        ('xdotool', 'getwindowfocus', 'getwindowname'),
+        stdout=subprocess.PIPE).communicate()[0]
+
 
 class PluginState(object):
   def __init__(self, handler):

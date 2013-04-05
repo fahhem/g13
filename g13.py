@@ -7,6 +7,9 @@ import usb1
 G13_KEY_BYTES = collections.namedtuple('G13_KEY_BYTES', [
     'stick_x', 'stick_y', 'keys'])
 
+class MissingG13Error(Exception):
+  """No G13 found on USB."""
+
 class G13(object):
   VENDOR_ID = 0x046d
   PRODUCT_ID = 0xc21c
@@ -25,6 +28,8 @@ class G13(object):
   def open(self):
     self.ctx = usb1.USBContext()
     dev = self.ctx.getByVendorIDAndProductID(self.VENDOR_ID, self.PRODUCT_ID)
+    if not dev:
+      raise MissingG13Error()
 
     self.handle = dev.open()
     if platform.system() == 'Linux' and \
