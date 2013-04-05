@@ -31,6 +31,7 @@ functions that take the state object and which key was pressed.
 plugins = [
   'plugins.example.register',
   'plugins.chrome.register',
+  'plugins.os.register',
 ]
 
 class G13Keys(object):
@@ -151,6 +152,15 @@ class ActionHelper(object):
     autopy.key.toggle(key, False, modifiers)
   def tap_key(self, key, modifiers=0):
     autopy.key.tap(key, modifiers)
+  # Mouse functions
+  def mouse_relative(self, x, y):
+    mx, my = autopy.mouse.get_pos()
+    try:
+      autopy.mouse.move(mx + x, my + y)
+    except ValueError:
+      pass
+  def mouse_toggle(self, down, button):
+    autopy.mouse.toggle(down, button)
   # Platform-specific functions
   def get_active_window_title(self):
     pass
@@ -158,11 +168,15 @@ class ActionHelper(object):
 # Constants pulled in from autopy for now, we reserve the right to change their
 # values, so always pull them from the state object's action instance. To make
 # sure, some of the attribute names don't match autopy's. :P
-for attr in dir(autopy.key):
+for attr in dir(autopy.key) + dir(autopy.mouse):
   if attr.startswith('MOD_'):
     setattr(ActionHelper, attr, getattr(autopy.key, attr))
   elif attr.startswith('K_'):
     setattr(ActionHelper, 'KEY_' + (attr[2:]), getattr(autopy.key, attr))
+  elif attr.endswith('_BUTTON'):
+    setattr(ActionHelper,
+            'MOUSE_' + attr.split('_')[0],
+            getattr(autopy.mouse, attr))
 
 class WindowsActionHelper(ActionHelper):
   def get_active_window_title(self):
@@ -232,10 +246,10 @@ class PluginState(object):
           else:
             state['key_release'][key] = [key_release[key]]
 
-  def handle_state_event(self, event, *args):
+  def handle_state_event(self, event):
     handlers = self.current_state.get(event, [])
     for handler in handlers:
-      handler(self, self.current_state, *args)
+      handler(self, self.current_state)
 
   def enter_state(self, state_name):
     if state_name == self.current_state_name:
@@ -271,6 +285,21 @@ class PluginState(object):
       [func(self, key) for func in funcs]
       break
 
+  def joystick(self, stick_x, stick_y):
+    # Similar to key_changed, but collapsing them will cause a huge
+    # hit to readability since joystick isn't a dict while
+    # key_press/release is.
+    local_stack = list(self.stack)
+    while local_stack:
+      state = local_stack.pop()
+      funcs = self.states[state].get('joystick', [])
+
+      if not funcs:
+        continue
+      [func(self, stick_x, stick_y) for func in funcs]
+      break
+
+
 def listen_for_keys():
   while True: # for _ in range(500):
     new_keys, changed_keys = handler.maybe_get_new_keys()
@@ -278,6 +307,7 @@ def listen_for_keys():
       continue
 
     # Check/call any registered events.
+    state.joystick(new_keys.stick_x, new_keys.stick_y)
     for i, byte in enumerate(changed_keys):
       if not byte: # Skip byte early.
         continue
@@ -286,15 +316,6 @@ def listen_for_keys():
           key = G13Keys.bytes[(i, j)]
           state.key_changed(key, new_keys.keys[i] & (1<<j))
         byte >>= 1
-
-    continue
-    for byte in new_keys.keys:
-      print hex(byte),
-    print
-    for byte in changed_keys:
-      print hex(byte),
-    print
-    print
 
 if __name__ == '__main__':
   handler = G13Handler()
@@ -307,9 +328,8 @@ if __name__ == '__main__':
   state.action.start_window_listener()
   try:
     listen_for_keys()
-  except Exception as e:
-    print 'error', e
-    raise
   finally:
+    for state_name in reversed(state.stack):
+      state.exit_state(state_name)
     state.action.stop_window_listener()
 
