@@ -205,6 +205,11 @@ class PluginState(object):
         state['exit'] = state.get('exit', [])
         state['exit'].append(exit)
 
+      joystick = actions.get('joystick')
+      if joystick:
+        state['joystick'] = state.get('joystick', [])
+        state['joystick'].append(joystick)
+
       key_press = actions.get('key_press')
       if key_press:
         state['key_press'] = state.get('key_press', {})
