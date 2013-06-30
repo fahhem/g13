@@ -5,7 +5,7 @@ import time
 import usb1
 import libusb1
 
-from g13 import G13
+from g13 import G13, MissingG13Error
 
 
 G13_KEYS = [ # Which bit should be set
@@ -159,7 +159,11 @@ class G13Wrapper(G13):
 
 def main(argv):
   g13 = G13Wrapper()
-  g13.open()
+  try:
+    g13.open()
+  except MissingG13Error:
+    print 'No G13 found.'
+    return
 
   g13.set_mode_leds(int(time.time() % 16))
   g13.set_color((255, 0, 0))
