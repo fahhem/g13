@@ -186,7 +186,7 @@ def main(argv):
         parse_keys(ui, keys)
 
         ui.flush()
-        write_lcd_bg(g13)
+        g13.write_lcd_bg()
       except libusb1.USBError as e:
         if e.value == -7:
           pass

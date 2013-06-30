@@ -74,7 +74,7 @@ def register(state):
   nop = lambda s, k: None
 
   key_press = {
-    'G' + str(key+1): plugin.change_tab for key in range(7)+[14-1]
+    'G' + str(key+1): plugin.change_tab for key in range(7)+[13]
   }
   key_press['G20'] = plugin.start_switch_tab
   key_press['G22'] = plugin.start_switch_tab
