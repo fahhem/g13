@@ -57,16 +57,11 @@ def weave_a1(source, dest, width):
 
 
 def python_rgb(source, dest, width):
-  RGB_R = lambda p: (p&0x00FF0000) >> 16
-  RGB_G = lambda p: (p&0x0000FF00) >> 8
-  RGB_B = lambda p: (p&0x000000FF) >> 0
   threshold = 128
   row, col = 0, 0
   for pi in xrange(len(source)/4):
-    pi = struct.unpack('<L', source[pi*4:pi*4+4])[0]
-    pixel = (RGB_R(pi) > threshold or
-             RGB_G(pi) > threshold or
-             RGB_B(pi) > threshold)
+    data = source[pi*4:pi*4+4]
+    pixel = data[1] > threshold and data[2] > threshold and data[3] > threshold
     idx = 32 + col + (row / 8) * width
     if pixel:
       dest[idx] |= 1 << (row % 8)
