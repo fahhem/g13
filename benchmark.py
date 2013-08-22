@@ -134,6 +134,16 @@ def benchmark_a1(func, n=10):
   height = 44
   surface = cairo.ImageSurface(
       cairo.FORMAT_A1, width, height)
+  context = cairo.Context(surface)
+  text = 'Benchmark Text'
+
+  context.set_source_rgb(1, 1, 1)
+  context.select_font_face('Verdana')
+  context.set_font_size(20)
+  height = context.text_extents(text)[3]
+  context.move_to(0, height)
+  context.show_text(text)
+
   source = bytearray(surface.get_data())
   dest = bytearray(32 + 960)
 
