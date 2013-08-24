@@ -300,7 +300,7 @@ class PluginState(object):
       break
 
 
-def listen_for_keys():
+def listen_for_keys(handler, state):
   while True: # for _ in range(500):
     new_keys, changed_keys = handler.maybe_get_new_keys()
     if not new_keys:  # Checking for None, not all 0s.
@@ -327,7 +327,7 @@ if __name__ == '__main__':
   state.enter_state('default')
   state.action.start_window_listener()
   try:
-    listen_for_keys()
+    listen_for_keys(handler, state)
   finally:
     for state_name in reversed(state.stack):
       state.exit_state(state_name)
