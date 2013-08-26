@@ -2,7 +2,6 @@ import threading
 import time
 
 class MouseThread(threading.Thread):
-  daemon = True
   def __init__(self, state_obj):
     self.state = state_obj
     self.relative = tuple()
@@ -21,6 +20,10 @@ class MouseThread(threading.Thread):
     self.relative = x, y
 
 class OSPlugin(object):
+  MOUSE_BUTTONS = {
+    'G17': 'MOUSE_LEFT',
+    'G18': 'MOUSE_RIGHT',
+  }
   def start_mouse_thread(self, state_obj, new_state):
     self.mouse_thread = MouseThread(state_obj)
     self.mouse_thread.start()
@@ -34,16 +37,10 @@ class OSPlugin(object):
       x = 0
     self.mouse_thread.set_relative(x, y)
   def click(self, state_obj, key):
-    if key == 'G17':
-      button = state_obj.action.MOUSE_LEFT
-    elif key == 'G18':
-      button = state_obj.action.MOUSE_RIGHT
+    button = getattr(state_obj.action, self.MOUSE_BUTTONS[key])
     state_obj.action.mouse_toggle(True, button=button)
   def unclick(self, state_obj, key):
-    if key == 'G17':
-      button = state_obj.action.MOUSE_LEFT
-    elif key == 'G18':
-      button = state_obj.action.MOUSE_RIGHT
+    button = getattr(state_obj.action, self.MOUSE_BUTTONS[key])
     state_obj.action.mouse_toggle(False, button=button)
 
 def register(state):
