@@ -1,25 +1,38 @@
 import threading
 import time
 
-class OSPlugin(object):
-  def __init__(self):
-    self.relative = 0, 0
-  def start_mouse_thread(self, state_obj, new_state):
+class MouseThread(threading.Thread):
+  daemon = True
+  def __init__(self, state_obj):
+    self.state = state_obj
+    self.relative = tuple()
     self.stopped = False
-    threading.Thread(target=self.move_mouse,
-                     args=(state_obj,)).start()
-  def stop_mouse_thread(self, state_obj, new_state):
-    self.stopped = True
-  def move_mouse(self, state_obj):
+    super(MouseThread, self).__init__()
+
+  def run(self):
     while not self.stopped:
       time.sleep(0.01)
       if self.relative:
-        state_obj.action.mouse_relative(*self.relative)
-  def joystick_relative(self, state_obj, stick_x, stick_y):
-    x = -((127 - stick_x) / 20)
-    y = -((127 - stick_y) / 20)
+        self.state.action.mouse_relative(*self.relative)
+  def stop(self):
+    self.stopped = True
+
+  def set_relative(self, x, y):
     self.relative = x, y
-    # print x, y, stick_x, stick_y
+
+class OSPlugin(object):
+  def start_mouse_thread(self, state_obj, new_state):
+    self.mouse_thread = MouseThread(state_obj)
+    self.mouse_thread.start()
+  def stop_mouse_thread(self, state_obj, new_state):
+    self.mouse_thread.stop()
+  def joystick_relative(self, state_obj, stick_x, stick_y):
+    x = -((127 - stick_x) / 15)
+    y = -((127 - stick_y) / 15)
+    if x == -1 and stick_x >= 107:
+      # It sometimes gets stuck here.
+      x = 0
+    self.mouse_thread.set_relative(x, y)
   def click(self, state_obj, key):
     if key == 'G17':
       button = state_obj.action.MOUSE_LEFT
