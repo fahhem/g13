@@ -20,6 +20,9 @@ class G13(object):
   REPORT_SIZE = 8
   REQUEST_TYPE = libusb1.LIBUSB_TYPE_CLASS | libusb1.LIBUSB_RECIPIENT_INTERFACE
 
+  LCD_WIDTH = 160
+  LCD_HEIGHT = 44
+
   def __init__(self):
     # 160 across and 43 down (6 bytes down)
     self.pixels = bytearray(992)

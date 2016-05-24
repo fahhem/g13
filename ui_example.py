@@ -1,11 +1,17 @@
+import datetime
 import sys
 import threading
 import time
+
+import numpy
+from scipy import weave
 
 import usb1
 import libusb1
 
 from g13 import G13, MissingG13Error
+
+import cairo
 
 
 G13_KEYS = [ # Which bit should be set
@@ -126,8 +132,77 @@ class TerminalUI(object):
 
 class G13UI(object):
   def __init__(self, g13):
-    self.prev_x, self.prev_y = 0, 0
     self.g13 = g13
+    self.surface = cairo.ImageSurface(
+        cairo.FORMAT_RGB24, g13.LCD_WIDTH, g13.LCD_HEIGHT)
+    self.context = cairo.Context(self.surface)
+    self.context.set_source_rgb(1, 1, 1)
+    self.context.select_font_face('Verdana')
+    self.context.set_font_size(35)
+
+  def reset(self):
+    self.context.set_operator(cairo.OPERATOR_CLEAR)
+    self.context.paint()
+    self.context.set_operator(cairo.OPERATOR_OVER)
+
+  def print_time(self):
+    self.reset()
+
+    width, height = self.context.text_extents('aA')[2:4]
+    self.context.move_to(0, height)
+    text = datetime.datetime.now().strftime('%I:%M:%S.%f')
+    self.context.show_text(text)
+    self.draw_surface()
+
+  def draw_image(self, filename, scale=1, offset=(0, 0)):
+    self.context.save()
+    new_surface = cairo.ImageSurface.create_from_png(filename)
+    self.context.scale(scale, scale)
+    self.context.set_source_surface(new_surface, *offset)
+    self.context.paint()
+    self.context.restore()
+    self.draw_surface()
+
+  def draw_surface(self):
+    source = self.surface.get_data()
+    dest = self.g13.pixels
+    width = self.g13.LCD_WIDTH
+    threshold = 128
+    support_code = """
+    #define RGB_R(x) ((x&0x00FF0000) >> 16)
+    #define RGB_G(x) ((x&0x0000FF00) >> 8)
+    #define RGB_B(x) ((x&0x000000FF) >> 0)
+    """
+    c_code = """
+    Py_buffer source_buffer;
+    PyObject_GetBuffer(source, &source_buffer, PyBUF_WRITABLE);
+
+    unsigned int* source_buf = (unsigned int*)source_buffer.buf;
+    int source_len = source_buffer.len;
+
+    char* dest_buf = PyByteArray_AsString(dest);
+
+    int row = 0, col = 0;
+    for (int pi=0; pi < source_len / 4; pi++) {
+      int pix = source_buf[pi];
+      bool pixel = RGB_R(pix) > %(threshold)s ||
+                   RGB_G(pix) > %(threshold)s ||
+                   RGB_B(pix) > %(threshold)s;
+      int idx = 32 + col + (row >> 3) * %(width)s;
+      if (pixel)
+        dest_buf[idx] |= 1 << (row & 0x07);
+      else
+        dest_buf[idx] &= ~(1 << (row & 0x07));
+
+      col++;
+      if (col >= %(width)s) {
+        col = 0;
+        row++;
+      }
+    }
+    """ % {'width': width, 'threshold': threshold}
+    weave.inline(c_code, ['source', 'dest'], support_code=support_code)
+    self.g13.write_lcd_bg()
 
   def print_block(self, x, y, val):
     self.g13.set_pixel(x, y, val)
@@ -171,10 +246,24 @@ def main(argv):
   g13.set_mode_leds(int(time.time() % 16))
   g13.set_color((255, 255, 255))
 
-  ui = TerminalUI()
-  ui.init_stick()
   g13ui = G13UI(g13)
 
+  g13ui.draw_image('x.png', scale=0.2, offset=(200, 0))
+
+  start = time.time()
+  times = []
+  while True: # for i in range(300):
+    g13ui.print_time()
+    t = 1/(time.time() - start)
+    times.append(t)
+    time.sleep(1 - (time.time() % 1))
+    start = time.time()
+  print sum(times)/len(times)
+
+  return
+
+  ui = TerminalUI()
+  ui.init_stick()
   try:
     while True:
       try:
